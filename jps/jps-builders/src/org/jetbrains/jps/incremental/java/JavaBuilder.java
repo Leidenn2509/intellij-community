@@ -270,7 +270,7 @@ public class JavaBuilder extends ModuleLevelBuilder {
   private ExitCode compile(CompileContext context,
                            ModuleChunk chunk,
                            DirtyFilesHolder<JavaSourceRootDescriptor, ModuleBuildTarget> dirtyFilesHolder,
-                           Collection<File> files,
+                           Collection<? extends File> files,
                            OutputConsumer outputConsumer,
                            JavaCompilingTool compilingTool,
                            boolean hasModules) throws Exception {
@@ -363,10 +363,10 @@ public class JavaBuilder extends ModuleLevelBuilder {
 
   private boolean compileJava(CompileContext context,
                               ModuleChunk chunk,
-                              Collection<File> files,
-                              Collection<File> originalClassPath,
-                              Collection<File> originalPlatformCp,
-                              Collection<File> sourcePath,
+                              Collection<? extends File> files,
+                              Collection<? extends File> originalClassPath,
+                              Collection<? extends File> originalPlatformCp,
+                              Collection<? extends File> sourcePath,
                               DiagnosticOutputConsumer diagnosticSink,
                               OutputFileConsumer outputSink,
                               JavaCompilingTool compilingTool,
@@ -410,7 +410,7 @@ public class JavaBuilder extends ModuleLevelBuilder {
       final int compilerSdkVersion = forkSdk == null ? JavaVersion.current().feature : forkSdk.getSecond();
 
       final Pair<List<String>, List<String>> vm_compilerOptions = getCompilationOptions(
-        compilerSdkVersion, context, chunk, profile, compilingTool
+        compilerSdkVersion, context, chunk, profile, hasModules, compilingTool
       );
       final List<String> vmOptions = vm_compilerOptions.first;
       final List<String> options = vm_compilerOptions.second;
@@ -420,7 +420,7 @@ public class JavaBuilder extends ModuleLevelBuilder {
         LOG.debug("Compiling chunk [" + chunk.getName() + "] with options: \"" + StringUtil.join(options, " ") + "\", mode=" + mode);
       }
 
-      Collection<File> platformCp = calcEffectivePlatformCp(originalPlatformCp, options, compilingTool);
+      Collection<? extends File> platformCp = calcEffectivePlatformCp(originalPlatformCp, options, compilingTool);
       if (platformCp == null) {
         String text = "Compact compilation profile was requested, but target platform for module \"" + chunk.getName() + "\"" +
                       " differs from javac's platform (" + System.getProperty("java.version") + ")\n" +
@@ -429,9 +429,9 @@ public class JavaBuilder extends ModuleLevelBuilder {
         return false;
       }
 
-      Collection<File> classPath = originalClassPath;
+      Collection<? extends File> classPath = originalClassPath;
       Collection<File> modulePath = Collections.emptyList();
-      Collection<File> upgradeModulePath = Collections.emptyList();
+      Collection<? extends File> upgradeModulePath = Collections.emptyList();
 
       if (hasModules) {
         // in Java 9, named modules are not allowed to read classes from the classpath
@@ -448,7 +448,7 @@ public class JavaBuilder extends ModuleLevelBuilder {
         // because platform classes are stored in jimage binary files with unknown format.
         // Because of this we are clearing platform classpath so that javac will resolve against its own boot classpath
         // and prepending additional jars from the JDK configuration to compilation classpath
-        classPath = JBIterable.from(platformCp).append(classPath).toList();
+        classPath = JBIterable.<File>from(platformCp).append(classPath).toList();
         platformCp = Collections.emptyList();
       }
 
@@ -625,7 +625,7 @@ public class JavaBuilder extends ModuleLevelBuilder {
   // If platformCp of the build process is the same as the target platform, do not specify platformCp explicitly
   // this will allow javac to resolve against ct.sym file, which is required for the "compilation profiles" feature
   @Nullable
-  private static Collection<File> calcEffectivePlatformCp(Collection<File> platformCp, List<String> options, JavaCompilingTool compilingTool) {
+  private static Collection<? extends File> calcEffectivePlatformCp(Collection<? extends File> platformCp, List<String> options, JavaCompilingTool compilingTool) {
     if (ourDefaultRtJar == null || !isJavac(compilingTool)) {
       return platformCp;
     }
@@ -730,6 +730,7 @@ public class JavaBuilder extends ModuleLevelBuilder {
                                                                         CompileContext context,
                                                                         ModuleChunk chunk,
                                                                         @Nullable ProcessorConfigProfile profile,
+                                                                        boolean withModules,
                                                                         @NotNull JavaCompilingTool compilingTool) {
     final List<String> compilationOptions = new ArrayList<>();
     final List<String> vmOptions = new ArrayList<>();
@@ -807,22 +808,22 @@ public class JavaBuilder extends ModuleLevelBuilder {
       vmOptions.addAll(extension.getOptions(compilingTool));
     }
 
-    addCompilationOptions(compilerSdkVersion, compilationOptions, context, chunk, profile);
+    addCompilationOptions(compilerSdkVersion, compilationOptions, context, chunk, profile, withModules);
 
     return pair(vmOptions, compilationOptions);
   }
 
-  public static void addCompilationOptions(List<String> options,
+  public static void addCompilationOptions(List<? super String> options,
                                            CompileContext context,
                                            ModuleChunk chunk,
                                            @Nullable ProcessorConfigProfile profile) {
-    addCompilationOptions(JavaVersion.current().feature, options, context, chunk, profile);
+    addCompilationOptions(JavaVersion.current().feature, options, context, chunk, profile, false);
   }
 
   private static void addCompilationOptions(int compilerSdkVersion,
-                                            List<String> options,
+                                            List<? super String> options,
                                             CompileContext context, ModuleChunk chunk,
-                                            @Nullable ProcessorConfigProfile profile) {
+                                            @Nullable ProcessorConfigProfile profile, boolean withModules) {
     if (!options.contains("-encoding")) {
       final CompilerEncodingConfiguration config = context.getProjectDescriptor().getEncodingConfiguration();
       final String encoding = config.getPreferredModuleChunkEncoding(chunk);
@@ -849,7 +850,7 @@ public class JavaBuilder extends ModuleLevelBuilder {
       }
     }
 
-    if (addAnnotationProcessingOptions(options, profile)) {
+    if (addAnnotationProcessingOptions(options, profile, withModules)) {
       final File srcOutput = ProjectPaths.getAnnotationProcessorGeneratedSourcesOutputDir(
         chunk.getModules().iterator().next(), chunk.containsTests(), profile
       );
@@ -864,7 +865,9 @@ public class JavaBuilder extends ModuleLevelBuilder {
   /**
    * @return true if annotation processing is enabled and corresponding options were added, false if profile is null or disabled
    */
-  public static boolean addAnnotationProcessingOptions(List<? super String> options, @Nullable AnnotationProcessingConfiguration profile) {
+  public static boolean addAnnotationProcessingOptions(List<? super String> options,
+                                                       @Nullable AnnotationProcessingConfiguration profile,
+                                                       boolean withModules) {
     if (profile == null || !profile.isEnabled()) {
       options.add("-proc:none");
       return false;
@@ -873,7 +876,7 @@ public class JavaBuilder extends ModuleLevelBuilder {
     // configuring annotation processing
     if (!profile.isObtainProcessorsFromClasspath()) {
       final String processorsPath = profile.getProcessorPath();
-      options.add("-processorpath");
+      options.add(withModules ? "--processor-module-path" : "-processorpath");
       options.add(FileUtil.toSystemDependentName(processorsPath.trim()));
     }
 
@@ -896,7 +899,7 @@ public class JavaBuilder extends ModuleLevelBuilder {
     return config == null ? JavaCompilers.JAVAC_ID : config.getJavaCompilerId();
   }
 
-  private static void addCrossCompilationOptions(int compilerSdkVersion, List<String> options, CompileContext context, ModuleChunk chunk) {
+  private static void addCrossCompilationOptions(int compilerSdkVersion, List<? super String> options, CompileContext context, ModuleChunk chunk) {
     final JpsJavaCompilerConfiguration compilerConfiguration = JpsJavaExtensionService.getInstance().getOrCreateCompilerConfiguration(
       context.getProjectDescriptor().getProject()
     );
@@ -1082,9 +1085,9 @@ public class JavaBuilder extends ModuleLevelBuilder {
     private volatile int myWarningCount;
     private final Set<File> myFilesWithErrors = new THashSet<>(FileUtil.FILE_HASHING_STRATEGY);
     @NotNull
-    private final Collection<JavacFileReferencesRegistrar> myRegistrars;
+    private final Collection<? extends JavacFileReferencesRegistrar> myRegistrars;
 
-    private DiagnosticSink(CompileContext context, @NotNull Collection<JavacFileReferencesRegistrar> refRegistrars) {
+    private DiagnosticSink(CompileContext context, @NotNull Collection<? extends JavacFileReferencesRegistrar> refRegistrars) {
       myContext = context;
       myRegistrars = refRegistrars;
     }

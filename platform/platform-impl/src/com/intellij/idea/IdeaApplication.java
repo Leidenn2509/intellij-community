@@ -41,10 +41,8 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
 
 public class IdeaApplication {
@@ -360,11 +358,11 @@ public class IdeaApplication {
       }
     }
 
-    private static Project loadProjectFromExternalCommandLine(String[] args) {
+    private static Project loadProjectFromExternalCommandLine(@NotNull List<String> commandLineArgs) {
       Project project = null;
-      if (args != null && args.length > 0 && args[0] != null) {
+      if (!commandLineArgs.isEmpty() && commandLineArgs.get(0) != null) {
         LOG.info("IdeaApplication.loadProject");
-        project = CommandLineProcessor.processExternalCommandLine(Arrays.asList(args), null);
+        project = CommandLineProcessor.processExternalCommandLine(commandLineArgs, null);
       }
       return project;
     }
@@ -378,13 +376,15 @@ public class IdeaApplication {
       // Event queue should not be changed during initialization of application components.
       // It also cannot be changed before initialization of application components because IdeEventQueue uses other
       // application components. So it is proper to perform replacement only here.
-      final ApplicationEx app = ApplicationManagerEx.getApplicationEx();
+      ApplicationEx app = ApplicationManagerEx.getApplicationEx();
       WindowManagerImpl windowManager = (WindowManagerImpl)WindowManager.getInstance();
       IdeEventQueue.getInstance().setWindowManager(windowManager);
 
+      List<String> commandLineArgs = args == null || args.length == 0 ? Collections.emptyList() : Arrays.asList(args);
+
       Ref<Boolean> willOpenProject = new Ref<>(Boolean.FALSE);
       AppLifecycleListener lifecyclePublisher = app.getMessageBus().syncPublisher(AppLifecycleListener.TOPIC);
-      lifecyclePublisher.appFrameCreated(args, willOpenProject);
+      lifecyclePublisher.appFrameCreated(commandLineArgs, willOpenProject);
 
       PluginManagerCore.dumpPluginClassStatistics();
 
@@ -409,7 +409,7 @@ public class IdeaApplication {
       }
 
       TransactionGuard.submitTransaction(app, () -> {
-        Project projectFromCommandLine = myPerformProjectLoad ? loadProjectFromExternalCommandLine(args) : null;
+        Project projectFromCommandLine = myPerformProjectLoad ? loadProjectFromExternalCommandLine(commandLineArgs) : null;
         app.getMessageBus().syncPublisher(AppLifecycleListener.TOPIC).appStarting(projectFromCommandLine);
 
         //noinspection SSBasedInspection
@@ -434,6 +434,7 @@ public class IdeaApplication {
     return myArgs;
   }
 
+  @SuppressWarnings("AssignmentToStaticFieldFromInstanceMethod")
   public void disableProjectLoad() {
     myPerformProjectLoad = false;
   }

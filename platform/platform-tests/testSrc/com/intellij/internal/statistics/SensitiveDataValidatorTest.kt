@@ -79,8 +79,8 @@ class SensitiveDataValidatorTest : UsefulTestCase() {
     assertEmpty(validator.getEventRules(eventLogGroup))
     assertTrue(validator.getEventDataRules(eventLogGroup).isEmpty())
 
-    assertEventAccepted(validator, eventLogGroup, "<any-string-accepted>")
-    assertEventDataAccepted(validator, eventLogGroup, "<any-key-accepted>", "<any-string-accepted>")
+    assertUndefinedRule(validator, eventLogGroup, "<any-string-accepted>")
+    assertEventDataUndefinedRule(validator, eventLogGroup, "<any-key-accepted>", "<any-string-accepted>")
   }
 
   @Test
@@ -138,13 +138,20 @@ class SensitiveDataValidatorTest : UsefulTestCase() {
   fun test_simple_expression_rules() {
     // custom expression is:   "JUST_TEXT[_{regexp:\\d+(\\+)?}_],xxx:{enum:AAA|BBB|CCC},zzz{enum#myEnum},yyy"
     val validator = createTestSensitiveDataValidator(loadContent("test_simple_expression_rules.json"))
-    val elg = EventLogGroup("my.simple.expression", 1)
+    var elg = EventLogGroup("my.simple.expression", 1)
 
     assertSize(1, validator.getEventRules(elg))
 
     assertEventAccepted(validator, elg, "JUST_TEXT[_123456_],xxx:CCC,zzzREF_AAA,yyy")
     assertEventRejected(validator, elg, "JUST_TEXT[_FOO_],xxx:CCC,zzzREF_AAA,yyy")
     assertEventRejected(validator, elg, "")
+
+    //  {enum:AAA|}foo
+    elg = EventLogGroup("my.simple.enum.node.with.empty.value", 1)
+    assertEventAccepted(validator, elg, "AAAfoo")
+    assertEventAccepted(validator, elg, "foo")
+    assertEventRejected(validator, elg, " foo")
+    assertEventRejected(validator, elg, " AAA foo")
   }
 //  @Test
 //  fun test_simple_util_rules() {
@@ -197,12 +204,20 @@ class SensitiveDataValidatorTest : UsefulTestCase() {
     TestCase.assertEquals(ValidationResultType.ACCEPTED, validator.validateEvent(eventLogGroup, EventContext.create(s, Collections.emptyMap())))
   }
 
+  private fun assertUndefinedRule(validator: SensitiveDataValidator, eventLogGroup: EventLogGroup, s: String) {
+    TestCase.assertEquals(ValidationResultType.UNDEFINED_RULE, validator.validateEvent(eventLogGroup, EventContext.create(s, Collections.emptyMap())))
+  }
+
   private fun assertEventRejected(validator: SensitiveDataValidator, eventLogGroup: EventLogGroup, s: String) {
     TestCase.assertEquals(ValidationResultType.REJECTED, validator.validateEvent(eventLogGroup, EventContext.create(s, Collections.emptyMap())))
   }
 
   private fun assertEventDataAccepted(validator: TestSensitiveDataValidator, eventLogGroup: EventLogGroup, key: String, dataValue: String) {
     TestCase.assertEquals(ValidationResultType.ACCEPTED, validator.validateEventData(eventLogGroup, key, dataValue))
+  }
+
+  private fun assertEventDataUndefinedRule(validator: TestSensitiveDataValidator, eventLogGroup: EventLogGroup, key: String, dataValue: String) {
+    TestCase.assertEquals(ValidationResultType.UNDEFINED_RULE, validator.validateEventData(eventLogGroup, key, dataValue))
   }
   private fun assertEventDataRejected(validator: TestSensitiveDataValidator, eventLogGroup: EventLogGroup, key: String, dataValue: String) {
     TestCase.assertEquals(ValidationResultType.REJECTED, validator.validateEventData(eventLogGroup, key, dataValue))
@@ -224,7 +239,7 @@ class SensitiveDataValidatorTest : UsefulTestCase() {
   }
 
 
-  internal inner class TestSensitiveDataValidator constructor(private val myContent: String) : SensitiveDataValidator() {
+  internal inner class TestSensitiveDataValidator constructor(private val myContent: String) : SensitiveDataValidator("TEST") {
     override fun getWhiteListContent(): String {
       return myContent
     }
@@ -245,7 +260,7 @@ class SensitiveDataValidatorTest : UsefulTestCase() {
       if (FeatureUsageData.platformDataKeys.contains(key)) return ValidationResultType.ACCEPTED
 
       val whiteListRule = eventsValidators[group.id]
-      return if (whiteListRule == null || !whiteListRule.areEventDataRulesDefined()) ValidationResultType.ACCEPTED
+      return if (whiteListRule == null || !whiteListRule.areEventDataRulesDefined()) ValidationResultType.UNDEFINED_RULE
       else whiteListRule.validateEventData(key, value, EventContext.create("", Collections.emptyMap())) // there are no configured rules
     }
   }

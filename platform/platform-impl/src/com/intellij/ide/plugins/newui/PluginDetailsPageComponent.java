@@ -201,6 +201,7 @@ public class PluginDetailsPageComponent extends MultiPanel {
     myVersion.putClientProperty("TextFieldWithoutMargins", Boolean.TRUE);
     myVersion.setEditable(false);
     myVersion.setFont(UIUtil.getLabelFont());
+    PluginManagerConfigurableNew.installTiny(myVersion);
     myVersion.setBorder(null);
     myVersion.setOpaque(false);
     myVersion.setForeground(CellPluginComponent.GRAY_COLOR);
@@ -215,6 +216,7 @@ public class PluginDetailsPageComponent extends MultiPanel {
 
     myVersionSize = new JLabel();
     myVersionSize.setFont(UIUtil.getLabelFont());
+    PluginManagerConfigurableNew.installTiny(myVersionSize);
 
     int offset = JBUI.scale(10);
     JPanel panel1 = new NonOpaquePanel(new TextHorizontalLayout(offset));
@@ -239,7 +241,7 @@ public class PluginDetailsPageComponent extends MultiPanel {
   private void createBottomPanel() {
     JPanel bottomPanel =
       new OpaquePanel(new VerticalLayout(PluginManagerConfigurableNew.offset5()), PluginManagerConfigurableNew.MAIN_BG_COLOR);
-    bottomPanel.setBorder(JBUI.Borders.emptyBottom(15));
+    bottomPanel.setBorder(JBUI.Borders.empty(0, 0, 15, 20));
 
     JBScrollPane scrollPane = new JBScrollPane(bottomPanel);
     scrollPane.getVerticalScrollBar().setBackground(PluginManagerConfigurableNew.MAIN_BG_COLOR);
@@ -361,7 +363,7 @@ public class PluginDetailsPageComponent extends MultiPanel {
 
     myVersion.setText(version);
     myVersionSize.setText(version);
-    myVersion.setPreferredSize(new Dimension(myVersionSize.getPreferredSize().width, myVersion.getPreferredSize().height));
+    myVersion.setPreferredSize(new Dimension(myVersionSize.getPreferredSize().width + JBUI.scale(4), myVersion.getPreferredSize().height));
 
     myVersion.setVisible(!StringUtil.isEmptyOrSpaces(version));
 
@@ -410,6 +412,9 @@ public class PluginDetailsPageComponent extends MultiPanel {
     if (MyPluginModel.isInstallingOrUpdate(myPlugin)) {
       showProgress();
     }
+    else {
+      fullRepaint();
+    }
   }
 
   private void updateIcon() {
@@ -425,7 +430,7 @@ public class PluginDetailsPageComponent extends MultiPanel {
     boolean errors = myPluginModel.hasErrors(myPlugin);
     if (errors) {
       Ref<String> enableAction = new Ref<>();
-      String message = PluginManagerConfigurableNew.getErrorMessage(myPluginModel, myPlugin, enableAction);
+      String message = myPluginModel.getErrorMessage(myPlugin, enableAction);
       ErrorComponent.show(myErrorComponent, message, enableAction.get(), enableAction.isNull() ? null : this::handleErrors);
     }
     myErrorComponent.setVisible(errors);
@@ -486,6 +491,7 @@ public class PluginDetailsPageComponent extends MultiPanel {
       return;
     }
 
+    updateIcon();
     updateEnableForNameAndIcon();
     updateErrors();
 
@@ -496,6 +502,8 @@ public class PluginDetailsPageComponent extends MultiPanel {
     if (myEnableDisableUninstallButton != null) {
       myEnableDisableUninstallButton.setText(title);
     }
+
+    fullRepaint();
   }
 
   private void doUninstall() {

@@ -38,13 +38,13 @@ import org.junit.Assume.assumeTrue
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.assertTrue
 
 class FileWatcherTest : BareTestFixtureTestCase() {
   //<editor-fold desc="Set up / tear down">
-
   private val LOG: Logger by lazy { Logger.getInstance(NativeFileWatcherImpl::class.java) }
 
   @Rule @JvmField val tempDir = TempDirectory()
@@ -94,7 +94,6 @@ class FileWatcherTest : BareTestFixtureTestCase() {
 
     LOG.debug("================== tearing down " + getTestName(false) + " ==================")
   }
-
   //</editor-fold>
 
   @Test fun testWatchRequestConvention() {
@@ -125,7 +124,7 @@ class FileWatcherTest : BareTestFixtureTestCase() {
   }
 
   @Test fun testNonCanonicallyNamedFileRoot() {
-    assumeTrue(!SystemInfo.isFileSystemCaseSensitive)
+    assumeTrue("case-insensitive FS only", !SystemInfo.isFileSystemCaseSensitive)
 
     val file = tempDir.newFile("test.txt")
     refresh(file)
@@ -175,6 +174,22 @@ class FileWatcherTest : BareTestFixtureTestCase() {
     assertEvents(
       { arrayOf(watchedFile1, watchedFile2, unwatchedFile).forEach { it.writeText("new content") } },
       mapOf(watchedFile1 to 'U', watchedFile2 to 'U'))
+  }
+
+  @Test fun testMove() {
+    val top = tempDir.newFolder("top")
+    val srcFile = tempDir.newFile("top/src/f")
+    val srcDir = tempDir.newFolder("top/src/sub")
+    tempDir.newFile("top/src/sub/f1")
+    tempDir.newFile("top/src/sub/f2")
+    val dst = tempDir.newFolder("top/dst")
+    val dstFile = File(dst, srcFile.name)
+    val dstDir = File(dst, srcDir.name)
+    refresh(top)
+
+    watch(top)
+    assertEvents({ Files.move(srcFile.toPath(), dstFile.toPath(), StandardCopyOption.ATOMIC_MOVE) }, mapOf(srcFile to 'D', dstFile to 'C'))
+    assertEvents({ Files.move(srcDir.toPath(), dstDir.toPath(), StandardCopyOption.ATOMIC_MOVE) }, mapOf(srcDir to 'D', dstDir to 'C'))
   }
 
   @Test fun testIncorrectPath() {
@@ -293,7 +308,7 @@ class FileWatcherTest : BareTestFixtureTestCase() {
   }
 
   @Test fun testJunctionWatchRoot() {
-    assumeTrue(SystemInfo.isWindows)
+    assumeTrue("windows-only", SystemInfo.isWindows)
 
     val top = tempDir.newFolder("top")
     val file = tempDir.newFile("top/dir1/dir2/dir3/test.txt")
@@ -314,7 +329,7 @@ class FileWatcherTest : BareTestFixtureTestCase() {
   }
 
   @Test fun testJunctionAboveWatchRoot() {
-    assumeTrue(SystemInfo.isWindows)
+    assumeTrue("windows-only", SystemInfo.isWindows)
 
     val top = tempDir.newFolder("top")
     val file = tempDir.newFile("top/dir1/dir2/dir3/test.txt")
@@ -370,7 +385,7 @@ class FileWatcherTest : BareTestFixtureTestCase() {
 */
 
   @Test fun testSubst() {
-    assumeTrue(SystemInfo.isWindows)
+    assumeTrue("windows-only", SystemInfo.isWindows)
 
     val target = tempDir.newFolder("top")
     val file = tempDir.newFile("top/sub/test.txt")
@@ -490,7 +505,7 @@ class FileWatcherTest : BareTestFixtureTestCase() {
   }
 
   @Test fun testHiddenFiles() {
-    assumeTrue(SystemInfo.isWindows)
+    assumeTrue("windows-only", SystemInfo.isWindows)
 
     val root = tempDir.newFolder("root")
     val file = tempDir.newFile("root/dir/file")
@@ -501,7 +516,7 @@ class FileWatcherTest : BareTestFixtureTestCase() {
   }
 
   @Test fun testFileCaseChange() {
-    assumeTrue(!SystemInfo.isFileSystemCaseSensitive)
+    assumeTrue("case-insensitive FS only", !SystemInfo.isFileSystemCaseSensitive)
 
     val root = tempDir.newFolder("root")
     val file = tempDir.newFile("root/file.txt")
@@ -520,7 +535,7 @@ class FileWatcherTest : BareTestFixtureTestCase() {
 
   @Test fun testUnicodePaths() {
     val name = IoTestUtil.getUnicodeName()
-    assumeTrue(name != null)
+    assumeTrue("Unicode names not supported", name != null)
 
     val root = tempDir.newFolder(name)
     val file = tempDir.newFile("${name}/${name}.txt")
@@ -531,7 +546,7 @@ class FileWatcherTest : BareTestFixtureTestCase() {
   }
 
   @Test fun testDisplacementByIsomorphicTree() {
-    assumeTrue(!SystemInfo.isMac)
+    assumeTrue("not mac again", !SystemInfo.isMac)
 
     val top = tempDir.newFolder("top")
     val root = tempDir.newFolder("top/root")
@@ -588,7 +603,7 @@ class FileWatcherTest : BareTestFixtureTestCase() {
   }
 
   @Test fun testUncRoot() {
-    assumeTrue(SystemInfo.isWindows)
+    assumeTrue("windows-only", SystemInfo.isWindows)
     watch(File("\\\\SRV\\share\\path"), checkRoots = WatchStatus.CHECK_NOT_WATCHED)
   }
 

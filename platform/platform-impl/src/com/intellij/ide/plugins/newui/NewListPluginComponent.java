@@ -19,6 +19,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.plaf.ButtonUI;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.util.List;
@@ -45,6 +46,7 @@ public class NewListPluginComponent extends CellPluginComponent {
   private JLabel myDownloads;
   private JLabel myVersion;
   private JLabel myVendor;
+  private JPanel myErrorPanel;
   private JComponent myErrorComponent;
   private OneLineProgressIndicator myIndicator;
   private EventHandler myEventHandler;
@@ -123,6 +125,19 @@ public class NewListPluginComponent extends CellPluginComponent {
               myBaseline = checkBox.getBaseline(size.width, size.height) - JBUI.scale(1);
             }
             return myBaseline;
+          }
+
+          @Override
+          public void setUI(ButtonUI ui) {
+            myBaseline = -1;
+            super.setUI(ui);
+          }
+
+          @Override
+          public Dimension getPreferredSize() {
+            Dimension size = super.getPreferredSize();
+            int scale = JBUI.scale(2);
+            return new Dimension(size.width + scale, size.height + scale);
           }
         });
 
@@ -247,17 +262,25 @@ public class NewListPluginComponent extends CellPluginComponent {
     if (errors) {
       boolean addListeners = myErrorComponent == null && myEventHandler != null;
 
+      if (myErrorPanel == null) {
+        myErrorPanel = new NonOpaquePanel();
+        myCenterPanel.add(myErrorPanel, VerticalLayout.FILL_HORIZONTAL);
+      }
+
       Ref<String> enableAction = new Ref<>();
-      String message = PluginManagerConfigurableNew.getErrorMessage(myPluginModel, myPlugin, enableAction);
-      myErrorComponent = ErrorComponent.show(myCenterPanel, VerticalLayout.FILL_HORIZONTAL, myErrorComponent, message, enableAction.get(),
+      String message = myPluginModel.getErrorMessage(myPlugin, enableAction);
+      myErrorComponent = ErrorComponent.show(myErrorPanel, BorderLayout.CENTER, myErrorComponent, message, enableAction.get(),
                                              enableAction.isNull() ? null : () -> myPluginModel.enableRequiredPlugins(myPlugin));
+      myErrorComponent.setBorder(JBUI.Borders.emptyTop(5));
 
       if (addListeners) {
+        myEventHandler.add(myErrorPanel);
         myEventHandler.add(myErrorComponent);
       }
     }
-    else if (myErrorComponent != null) {
-      myCenterPanel.remove(myErrorComponent);
+    else if (myErrorPanel != null) {
+      myCenterPanel.remove(myErrorPanel);
+      myErrorPanel = null;
       myErrorComponent = null;
     }
   }

@@ -45,7 +45,7 @@ class TabContentLayout extends ContentLayout {
       return myLastLayout.moreRect;
     }
   };
-  List<AnAction> myDoubleClickActions = ContainerUtil.newArrayList();
+  List<AnAction> myDoubleClickActions = new ArrayList<>();
 
   TabContentLayout(ToolWindowContentUi ui) {
     super(ui);
@@ -91,7 +91,7 @@ class TabContentLayout extends ContentLayout {
     myDoubleClickActions = ContainerUtil.newArrayList(actions);
   }
 
-  private static void showPopup(MouseEvent e, List<ContentTabLabel> tabs) {
+  private static void showPopup(MouseEvent e, List<? extends ContentTabLabel> tabs) {
     final List<Content> contentsToShow = ContainerUtil.map(tabs, ContentTabLabel::getContent);
     final SelectContentStep step = new SelectContentStep(contentsToShow);
     JBPopupFactory.getInstance().createListPopup(step).show(new RelativePoint(e));
@@ -267,7 +267,7 @@ class TabContentLayout extends ContentLayout {
     }
   }
 
-  private JBTabPainter tabPainter = JBTabPainter.Companion.getTOOL_WINDOW();
+  private JBTabPainter tabPainter = JBTabPainter.getTOOL_WINDOW();
 
   @Override
   public void paintComponent(Graphics g) {

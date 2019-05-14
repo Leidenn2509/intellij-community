@@ -59,9 +59,9 @@ public class FindSymbolParameters {
     return myIdFilter;
   }
 
-  @Nullable
+  @NotNull
   public Project getProject() {
-    return mySearchScope.getProject();
+    return ObjectUtils.notNull(mySearchScope.getProject());
   }
 
   public boolean isSearchInLibraries() {
@@ -69,12 +69,12 @@ public class FindSymbolParameters {
   }
 
   public static FindSymbolParameters wrap(@NotNull String pattern, @NotNull Project project, boolean searchInLibraries) {
-    return new FindSymbolParameters(pattern, pattern, searchScopeFor(project, searchInLibraries), null);
+    return new FindSymbolParameters(pattern, pattern, searchScopeFor(project, searchInLibraries),
+                                    IdFilter.getProjectIdFilter(project, searchInLibraries));
   }
 
   public static FindSymbolParameters wrap(@NotNull String pattern, @NotNull GlobalSearchScope scope) {
-    IdFilter idFilter = IdFilter.getProjectIdFilter(ObjectUtils.notNull(scope.getProject()), scope.isSearchInLibraries());
-    return new FindSymbolParameters(pattern, pattern, scope, idFilter);
+    return new FindSymbolParameters(pattern, pattern, scope, null);
   }
 
   public static FindSymbolParameters simple(@NotNull Project project, boolean searchInLibraries) {

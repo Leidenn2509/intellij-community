@@ -100,6 +100,9 @@ public class DataFlowInspectionTrackerTest extends LightCodeInsightFixtureTestCa
       return new TrackingRunner.NullableDfaProblemType();
     }
     CommonDataflow.DataflowResult result = CommonDataflow.getDataflowResult(expression);
+    if (expression instanceof PsiCallExpression && !result.cannotFailByContract((PsiCallExpression)expression)) {
+      return new TrackingRunner.FailingCallDfaProblemType();
+    }
     assertNotNull("No common dataflow result for expression: " + selectedText, result);
     Set<Object> values = result.getExpressionValues(expression);
     assertEquals("No single value for expression: "+selectedText, 1, values.size());
@@ -149,4 +152,24 @@ public class DataFlowInspectionTrackerTest extends LightCodeInsightFixtureTestCa
   public void testNpeSimple() { doTest(); }
   public void testNpeAnnotation() { doTest(); }
   public void testNpeWithCast() { doTest(); }
+  public void testAssignTernaryNotNull() { doTest(); }
+  public void testAssignTernaryNumeric() { doTest(); }
+  public void testTrivialContract() { doTest(); }
+  public void testTripleCheck() { doTest(); }
+  public void testInstanceOfSecondCheck() { doTest(); }
+  public void testNullCheckNpeNullCheck() { doTest(); }
+  public void testListAddContract() { doTest(); }
+  public void testConstantStrings() { doTest(); }
+  public void testConstantStrings2() { doTest(); }
+  public void testNumericCast() { doTest(); }
+  public void testNumericCast2() { doTest(); }
+  public void testNumericWidening() { doTest(); }
+  public void testSimpleContract() { doTest(); }
+  public void testSimpleContract2() { doTest(); }
+  public void testEqualsContract() { doTest(); }
+  public void testCollectionSizeEquality() { doTest(); }
+  public void testFailingCall() { doTest(); }
+  public void testInstanceOfMethodReturn() { doTest(); }
+  public void testReassignAfterCheck() { doTest(); }
+  public void testAndAllTrue() { doTest(); }
 }

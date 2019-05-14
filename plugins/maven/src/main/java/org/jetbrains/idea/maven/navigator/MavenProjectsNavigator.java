@@ -9,7 +9,6 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.*;
-import com.intellij.openapi.project.DumbAwareRunnable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.WriteExternalException;
@@ -155,11 +154,13 @@ public final class MavenProjectsNavigator extends MavenSimpleProjectComponent im
   }
 
   private void doInit() {
-    listenForProjectsChanges();
-    if (isUnitTestMode()) return;
-    MavenUtil.runWhenInitialized(myProject, (DumbAwareRunnable)() -> {
-      if (myProject.isDisposed()) return;
-      initToolWindow();
+    MavenProjectsManager.getInstance(myProject).addManagerListener(new MavenProjectsManager.Listener() {
+      @Override
+      public void activated() {
+        initToolWindow();
+        listenForProjectsChanges();
+        scheduleStructureUpdate();
+      }
     });
   }
 
@@ -339,8 +340,17 @@ public final class MavenProjectsNavigator extends MavenSimpleProjectComponent im
     }
 
     if (myToolWindow == null) return;
+
     MavenUtil.invokeLater(myProject, () -> {
-      if (!myToolWindow.isVisible()) return;
+      boolean hasMavenProjects = !MavenProjectsManager.getInstance(myProject).getProjects().isEmpty();
+
+      if (myToolWindow.isAvailable() != hasMavenProjects) {
+        myToolWindow.setAvailable(hasMavenProjects, null);
+
+        if (hasMavenProjects) {
+          myToolWindow.activate(null);
+        }
+      }
 
       boolean shouldCreate = myStructure == null;
       if (shouldCreate) {
@@ -363,12 +373,7 @@ public final class MavenProjectsNavigator extends MavenSimpleProjectComponent im
     scheduleStructureRequest(() -> myStructure.update());
   }
 
-  private final class MyProjectsListener implements MavenProjectsManager.Listener, MavenProjectsTree.Listener {
-    @Override
-    public void activated() {
-      scheduleStructureUpdate();
-    }
-
+  private final class MyProjectsListener implements MavenProjectsTree.Listener {
     @Override
     public void projectsIgnoredStateChanged(@NotNull final List<MavenProject> ignored, @NotNull final List<MavenProject> unignored, boolean fromImport) {
       scheduleStructureRequest(() -> myStructure.updateIgnored(ContainerUtil.concat(ignored, unignored)));
